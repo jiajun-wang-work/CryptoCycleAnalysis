@@ -57,7 +57,8 @@ def fetch_coin_history_yahoo(ticker_symbol):
         
         return df
     except Exception as e:
-        st.error(f"Error fetching data for {ticker_symbol} from Yahoo Finance: {e}")
+        # st.error(f"Error fetching data for {ticker_symbol} from Yahoo Finance: {e}")
+        print(f"Error fetching data for {ticker_symbol} from Yahoo Finance: {e}")
         return pd.DataFrame()
 
 def fetch_coin_history_binance(symbol):
@@ -165,6 +166,20 @@ def fetch_coin_history(coin_name, api_key=None, source="Auto"):
     
     # SPECIAL HANDLING FOR ETH: Load local early history (2015-2017)
     df_local = pd.DataFrame()
+    
+    # Check for BTC local data (Robust Fallback)
+    if cg_id == "bitcoin":
+        try:
+            local_file = "btc_daily_data.csv"
+            if os.path.exists(local_file):
+                df_local = pd.read_csv(local_file)
+                df_local["timestamp"] = pd.to_datetime(df_local["timestamp"])
+                df_local.set_index("timestamp", inplace=True)
+                df_local.index = df_local.index.tz_localize(None)
+        except:
+            pass
+            
+    # Check for ETH local data
     if cg_id == "ethereum":
         try:
             local_file = "eth_early_2015_2017.csv"
