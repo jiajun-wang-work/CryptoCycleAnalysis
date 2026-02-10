@@ -10,22 +10,22 @@ from datetime import datetime
 BASE_URL = "https://api.coingecko.com/api/v3"
 
 # Top Coins Mapping (User Requested)
-# Name: (CoinGecko ID, Yahoo Ticker, Binance Symbol)
+# Name: (CoinGecko ID, Yahoo Ticker, Binance Symbol, OKEx Symbol)
 COINS = {
-    "Bitcoin (BTC)": ("bitcoin", "BTC-USD", "BTCUSDT"),
-    "Ethereum (ETH)": ("ethereum", "ETH-USD", "ETHUSDT"),
-    "Solana (SOL)": ("solana", "SOL-USD", "SOLUSDT"),
-    "Binance Coin (BNB)": ("binancecoin", "BNB-USD", "BNBUSDT"),
-    "Sui (SUI)": ("sui", "SUI-USD", "SUIUSDT"),
-    "XRP (XRP)": ("ripple", "XRP-USD", "XRPUSDT"),
-    "Dogecoin (DOGE)": ("dogecoin", "DOGE-USD", "DOGEUSDT"),
-    "Hyperliquid (HYPE)": ("hyperliquid", "HYPE-USD", "HYPEUSDT"),
-    "Toncoin (TON)": ("the-open-network", "TON11419-USD", "TONUSDT"),
-    "Sei (SEI)": ("sei-network", "SEI-USD", "SEIUSDT"),
-    "Aptos (APT)": ("aptos", "APT-USD", "APTUSDT"),
-    "Bitget Token (BGB)": ("bitget-token", "BGB-USD", "BGBUSDT"),
-    "OKB (OKB)": ("okb", "OKB-USD", "OKBUSDT"),
-    "Astar (ASTR)": ("astar", "ASTR-USD", "ASTRUSDT"),
+    "Bitcoin (BTC)": ("bitcoin", "BTC-USD", "BTCUSDT", "BTC-USDT"),
+    "Ethereum (ETH)": ("ethereum", "ETH-USD", "ETHUSDT", "ETH-USDT"),
+    "Solana (SOL)": ("solana", "SOL-USD", "SOLUSDT", "SOL-USDT"),
+    "Binance Coin (BNB)": ("binancecoin", "BNB-USD", "BNBUSDT", "BNB-USDT"),
+    "Sui (SUI)": ("sui", "SUI-USD", "SUIUSDT", "SUI-USDT"),
+    "XRP (XRP)": ("ripple", "XRP-USD", "XRPUSDT", "XRP-USDT"),
+    "Dogecoin (DOGE)": ("dogecoin", "DOGE-USD", "DOGEUSDT", "DOGE-USDT"),
+    "Hyperliquid (HYPE)": ("hyperliquid", "HYPE-USD", "HYPEUSDT", "HYPE-USDT"),
+    "Toncoin (TON)": ("the-open-network", "TON11419-USD", "TONUSDT", "TON-USDT"),
+    "Sei (SEI)": ("sei-network", "SEI-USD", "SEIUSDT", "SEI-USDT"),
+    "Aptos (APT)": ("aptos", "APT-USD", "APTUSDT", "APT-USDT"),
+    "Bitget Token (BGB)": ("bitget-token", "BGB-USD", "BGBUSDT", "BGB-USDT"),
+    "OKB (OKB)": ("okb", "OKB-USD", "OKBUSDT", "OKB-USDT"),
+    "Astar (ASTR)": ("astar", "ASTR-USD", "ASTRUSDT", "ASTR-USDT"),
 }
 
 def fetch_coin_history_yahoo(ticker_symbol):
@@ -132,13 +132,99 @@ def fetch_coin_history_binance(symbol):
     except Exception as e:
         return pd.DataFrame()
 
+def fetch_coin_history_okex(inst_id):
+    """
+    Fetches historical data from OKEx API.
+    Args:
+        inst_id (str): The OKEx instrument ID (e.g., 'HYPE-USDT').
+    Returns:
+        pd.DataFrame: DataFrame containing 'price' column indexed by datetime.
+    """
+    base_url = "https://www.okx.com/api/v5/market/history-candles"
+    all_data = []
+    end_ts = None
+    
+    try:
+        # Fetch up to ~1000 days
+        for _ in range(10): 
+            params = {
+                "instId": inst_id,
+                "bar": "1D",
+                "limit": "100"
+            }
+            if end_ts:
+                params["after"] = end_ts
+                
+            response = requests.get(base_url, params=params, timeout=5)
+            if response.status_code != 200:
+                break
+                
+            data = response.json().get("data", [])
+            if not data:
+                break
+                
+            all_data.extend(data)
+            end_ts = data[-1][0] # Timestamp of the last candle
+            time.sleep(0.1)
+            
+        # If history empty, try recent candles
+        if not all_data:
+             base_url_recent = "https://www.okx.com/api/v5/market/candles"
+             response = requests.get(base_url_recent, params={"instId": inst_id, "bar": "1D", "limit": "100"}, timeout=5)
+             if response.status_code == 200:
+                 all_data = response.json().get("data", [])
+
+        if not all_data:
+            return pd.DataFrame()
+
+        # OKEx data: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+        df = pd.DataFrame(all_data, columns=["ts", "o", "h", "l", "c", "vol", "volCcy", "volCcyQuote", "confirm"])
+        df["timestamp"] = pd.to_datetime(df["ts"].astype(int), unit="ms")
+        df["price"] = df["c"].astype(float)
+        df.set_index("timestamp", inplace=True)
+        df.sort_index(inplace=True)
+        
+        return df[["price"]]
+        
+    except Exception as e:
+        print(f"Error fetching OKEx history: {e}")
+        return pd.DataFrame()
+
+def fetch_current_price_okex(inst_id):
+    """
+    Fetches the current price from OKEx.
+    """
+    try:
+        url = "https://www.okx.com/api/v5/market/ticker"
+        params = {"instId": inst_id}
+        response = requests.get(url, params=params, timeout=3)
+        if response.status_code == 200:
+            data = response.json().get("data", [])
+            if data:
+                ticker = data[0]
+                last = float(ticker["last"])
+                open24 = float(ticker["open24h"])
+                change = ((last - open24) / open24) * 100 if open24 else 0
+                return {
+                    "usd": last,
+                    "usd_24h_change": change
+                }
+    except Exception as e:
+        pass
+    return None
+
 @st.cache_data(ttl=3600)  # Cache for 1 hour
 def fetch_coin_history(coin_name, api_key=None, source="Auto"):
     """
     Fetches the entire price history of a coin.
-    Source can be: "Auto", "CoinGecko", "Binance", "Yahoo"
+    Source can be: "Auto", "CoinGecko", "Binance", "Yahoo", "OKEx"
     """
-    cg_id, yahoo_ticker, binance_symbol = COINS.get(coin_name, ("bitcoin", "BTC-USD", "BTCUSDT"))
+    entry = COINS.get(coin_name, ("bitcoin", "BTC-USD", "BTCUSDT", "BTC-USDT"))
+    if len(entry) == 4:
+        cg_id, yahoo_ticker, binance_symbol, okex_symbol = entry
+    else:
+        cg_id, yahoo_ticker, binance_symbol = entry
+        okex_symbol = binance_symbol.replace("USDT", "-USDT")
     
     # Logic for Source Selection
     
@@ -151,19 +237,29 @@ def fetch_coin_history(coin_name, api_key=None, source="Auto"):
         df = fetch_coin_history_binance(binance_symbol)
         if not df.empty: return df, "Binance"
         
-    # 3. Force Yahoo
+    # 3. Force OKEx
+    if source == "OKEx":
+        df = fetch_coin_history_okex(okex_symbol)
+        if not df.empty: return df, "OKEx"
+
+    # 4. Force Yahoo
     if source == "Yahoo":
         return fetch_coin_history_yahoo(yahoo_ticker), "Yahoo Finance"
         
-    # 4. Auto Mode (Default)
-    # Priority: CoinGecko (Best Data) -> Combine(Yahoo + Binance)
+    # 5. Auto Mode (Default)
+    # Priority: CoinGecko (Best Data) -> OKEx (For HYPE etc) -> Combine(Yahoo + Binance)
     
     # Try CoinGecko first (even without key, for best history coverage)
     df_cg = _fetch_coingecko(cg_id, api_key)
     if not df_cg.empty: 
         return df_cg, "CoinGecko"
         
-    # If CoinGecko fails, we try to combine Yahoo (longer history) and Binance (better quality recent)
+    # Try OKEx
+    df_okex = fetch_coin_history_okex(okex_symbol)
+    if not df_okex.empty:
+        return df_okex, "OKEx"
+        
+    # If CoinGecko/OKEx fails, we try to combine Yahoo (longer history) and Binance (better quality recent)
     df_yahoo = fetch_coin_history_yahoo(yahoo_ticker)
     df_binance = fetch_coin_history_binance(binance_symbol)
     
@@ -278,7 +374,12 @@ def fetch_current_price(coin_name, api_key=None):
     """
     Fetches the current price of a coin.
     """
-    cg_id, yahoo_ticker, binance_symbol = COINS.get(coin_name, ("bitcoin", "BTC-USD", "BTCUSDT"))
+    entry = COINS.get(coin_name, ("bitcoin", "BTC-USD", "BTCUSDT", "BTC-USDT"))
+    if len(entry) == 4:
+        cg_id, yahoo_ticker, binance_symbol, okex_symbol = entry
+    else:
+        cg_id, yahoo_ticker, binance_symbol = entry
+        okex_symbol = binance_symbol.replace("USDT", "-USDT")
 
     # Try CoinGecko first
     # Even without key, we try it once (it might work and has best data)
@@ -301,6 +402,11 @@ def fetch_current_price(coin_name, api_key=None):
     except:
         pass
     
+    # Try OKEx for current price (Good for HYPE)
+    okex_price = fetch_current_price_okex(okex_symbol)
+    if okex_price:
+        return okex_price
+
     # Try Binance for current price
     try:
         url = "https://api.binance.com/api/v3/ticker/24hr"
