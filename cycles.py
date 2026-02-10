@@ -2,6 +2,8 @@ import pandas as pd
 import datetime
 
 # Halving Dates (Cycle 0 is Genesis)
+# These dates mark the beginning of each Bitcoin market cycle.
+# Used to anchor the analysis for all cryptocurrencies to compare performance relative to Bitcoin's cycle.
 HALVING_DATES = {
     0: "2009-01-03", # Genesis Block
     1: "2012-11-28",
@@ -12,7 +14,20 @@ HALVING_DATES = {
 
 def get_cycle_data(df):
     """
-    Segments the DataFrame into cycles based on halving dates.
+    Segments the historical price DataFrame into distinct market cycles based on Bitcoin halving dates.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing 'price' column and datetime index.
+        
+    Returns:
+        dict: A dictionary where keys are cycle numbers (0-4) and values are dictionaries containing:
+              - 'data': DataFrame of prices within that cycle.
+              - 'start_date': The halving date that started the cycle.
+              - 'actual_start_date': The first date data was available for the coin in this cycle.
+              - 'end_date': The end date of the cycle (next halving or today).
+              - 'high': The maximum price reached in the cycle.
+              - 'high_days': Days from halving to the cycle high.
+              - 'low': The minimum price in the cycle.
     """
     cycles = {}
     
@@ -29,29 +44,29 @@ def get_cycle_data(df):
         else:
             end_date = pd.Timestamp.now()
             
-        # Filter data
+        # Filter data to get only records within the current cycle's date range
         cycle_df = df[(df.index >= start_date) & (df.index < end_date)].copy()
         
-        # Calculate "Days Since Halving"
+        # Calculate "Days Since Halving" for x-axis alignment
         cycle_df["days_since_halving"] = (cycle_df.index - start_date).days
         
-        # Normalize price (optional: price / price_at_halving)
+        # Normalize price (optional: price / price_at_halving) - currently not used for main chart but calculated
         if not cycle_df.empty:
             start_price = cycle_df.iloc[0]["price"]
             cycle_df["price_normalized"] = cycle_df["price"] / start_price
             
-            # Find Highs and Lows
+            # Find Highs and Lows within the cycle
             high_price = cycle_df["price"].max()
             low_price = cycle_df["price"].min()
             high_date = cycle_df["price"].idxmax()
             low_date = cycle_df["price"].idxmin()
             
-            # Determine actual start date for this coin in this cycle
+            # Determine actual start date for this coin in this cycle (coin might have launched mid-cycle)
             actual_start_date = cycle_df.index.min()
             
             cycles[cycle_num] = {
                 "data": cycle_df,
-                "start_date": start_date, # BTC Halving Date (Theoretical)
+                "start_date": start_date, # BTC Halving Date (Theoretical start)
                 "actual_start_date": actual_start_date, # Coin's First Data Date in this cycle
                 "end_date": end_date,
                 "high": high_price,
@@ -65,6 +80,13 @@ def get_cycle_data(df):
     return cycles
 
 def get_current_cycle_progress():
+    """
+    Calculates the percentage progress of the current Bitcoin cycle.
+    Assumes a 4-year cycle (approx. 1460 days).
+    
+    Returns:
+        dict: containing 'days_passed', 'progress_pct', and 'halving_date'.
+    """
     last_halving = pd.to_datetime(HALVING_DATES[4])
     now = pd.Timestamp.now()
     days_passed = (now - last_halving).days

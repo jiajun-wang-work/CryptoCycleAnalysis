@@ -30,207 +30,112 @@ st.markdown("""
     .stProgress > div > div > div > div {
         background-color: #f63366;
     }
-    
-    /* Fixed Top Right Language Switcher */
-    /* Select the first stHorizontalBlock in the main area (which contains our flags) */
-    /* Note: We use a specific structure selector. This is a bit hacky but works for now. */
-    /* Strategy: The flags are in the first columns block. We will target the buttons inside it. */
-    
-    /* Target the container of the buttons to fix it to top right */
-    /* We use the sibling selector to find the div immediately after our anchor span */
-    /* The anchor span is inserted just before the columns */
-    div:has(span#lang-nav-anchor) + div {
-        position: fixed !important;
-        top: 2.5rem !important; /* Move up slightly */
-        right: 4.5rem !important; /* Move left to avoid 3-dots menu */
-        width: auto !important;
-        z-index: 999990 !important;
-        background-color: rgba(14, 17, 23, 0.8) !important;
-        border-radius: 15px !important;
-        padding: 5px !important;
-        gap: 0.5rem !important;
-        backdrop-filter: blur(5px);
-    }
-    
-    /* Adjust spacing within the columns */
-    div:has(span#lang-nav-anchor) + div > div {
-        width: auto !important;
-        flex: 0 1 auto !important;
-        min-width: 0 !important;
-    }
-
-    /* Style the Buttons to look like Icons */
-    div:has(span#lang-nav-anchor) + div button {
-        border: none !important;
-        background: transparent !important;
-        padding: 0px 5px !important;
-        font-size: 1.2rem !important;
-        line-height: 1 !important;
-        min-height: 0px !important;
-        height: auto !important;
-        box-shadow: none !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    /* Ensure no background/border on hover/focus/active */
-    div:has(span#lang-nav-anchor) + div button:hover,
-    div:has(span#lang-nav-anchor) + div button:focus,
-    div:has(span#lang-nav-anchor) + div button:active {
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: inherit !important;
-    }
-    
-    /* Unselected State (Secondary) -> Dimmed */
-    div:has(span#lang-nav-anchor) + div button[kind="secondary"] {
-        opacity: 0.3 !important;
-        filter: grayscale(100%) !important;
-        transform: scale(0.9);
-    }
-    
-    /* Selected State (Primary) -> Bright & Glow */
-    div:has(span#lang-nav-anchor) + div button[kind="primary"] {
-        opacity: 1.0 !important;
-        filter: grayscale(0%) !important;
-        transform: scale(1.2);
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    }
-    
-    /* Hover Effect */
-    div:has(span#lang-nav-anchor) + div button:hover {
-        opacity: 1.0 !important;
-        transform: scale(1.1);
-    }
-
 </style>
 """, unsafe_allow_html=True)
 
-# --- Top Right Language Selector ---
-# Use columns to position the language selector at the top right
-# We use a single block here, CSS will move it to fixed position
-# col_spacer is removed as it's not needed for fixed positioning
+# --- Sidebar ---
 
-# Inject Anchor for CSS positioning
-st.markdown('<span id="lang-nav-anchor"></span>', unsafe_allow_html=True)
-
-# Language Selector (Icons Only)
-# Define available languages and their flags
-langs = ["🇬🇧", "🇨🇳", "🇯🇵"]
-
-# Determine current language first to set button types
+# 1. Language Selector
+# Moved to sidebar top for better accessibility
 if 'language' not in st.session_state:
     st.session_state['language'] = "🇬🇧"
-current_lang = st.session_state['language']
 
-# Create columns for flags (Compact)
-# Use a unique key for the container to target if needed, though :has is used above
-c1, c2, c3 = st.columns([1, 1, 1])
+lang_options = {
+    "🇬🇧": "🇬🇧 English", 
+    "🇨🇳": "🇨🇳 中文", 
+    "🇯🇵": "🇯🇵 日本語"
+}
+lang_map_rev = {v: k for k, v in lang_options.items()}
 
-def set_lang(l):
-    st.session_state['language'] = l
+# Determine current language code
+current_code = st.session_state['language']
+if current_code not in lang_options:
+    current_code = "🇬🇧"
+    st.session_state['language'] = current_code
+    
+current_display = lang_options[current_code]
+try:
+    current_index = list(lang_options.values()).index(current_display)
+except ValueError:
+    current_index = 0
+
+# Render language selector in sidebar
+selected_display = st.sidebar.selectbox(
+    "Language",
+    options=list(lang_options.values()),
+    index=current_index,
+    label_visibility="collapsed",
+    key="lang_select_box_sidebar"
+)
+
+# Handle language change
+new_code = lang_map_rev[selected_display]
+if new_code != st.session_state['language']:
+    st.session_state['language'] = new_code
     st.rerun()
 
-with c1:
-    # Use type="primary" for selected, "secondary" for unselected
-    btn_type = "primary" if current_lang == "🇬🇧" else "secondary"
-    if st.button("🇬🇧", key="lang_en", type=btn_type):
-        set_lang("🇬🇧")
-        
-with c2:
-    btn_type = "primary" if current_lang == "🇨🇳" else "secondary"
-    if st.button("🇨🇳", key="lang_cn", type=btn_type):
-        set_lang("🇨🇳")
-        
-with c3:
-    btn_type = "primary" if current_lang == "🇯🇵" else "secondary"
-    if st.button("🇯🇵", key="lang_jp", type=btn_type):
-        set_lang("🇯🇵")
-
-t = TRANSLATIONS[current_lang] # Get current translation dictionary
-
-# --- Sidebar ---
+# Set current language translation
+current_lang = st.session_state['language']
+t = TRANSLATIONS[current_lang]
 
 st.sidebar.title(t["sidebar_title"])
 
-# Coin Selector
-# Use radio as requested by user (No dropdowns)
-selected_coin = st.sidebar.radio(t["select_asset"], list(COINS.keys()))
+# 2. Coin Selector
+# Dropdown for selecting the crypto asset to analyze
+selected_coin = st.sidebar.selectbox(t["select_asset"], list(COINS.keys()))
 
-# API Key Input
-# Default to Auto source, hide selection
+# 3. API Configuration
+# Currently set to 'Auto' to try CoinGecko first, then fallback to Yahoo/Binance
 selected_source = "Auto"
-api_key = None # Settings removed per user request
+api_key = None 
 
-# with st.sidebar.expander(t["settings"]):
-#     api_key = st.text_input(t["api_key_label"], type="password", help=t["api_key_help"])
-
-# Navigation
+# 4. Navigation
+# Radio buttons for switching between different analysis pages
 page_options = list(t["nav_options"].keys())
-# Mapping display name to key
-page_map = {v: k for k, v in t["nav_options"].items()}
-
-# Determine current page index to maintain state
-current_page_canonical = st.session_state.get('current_page_canonical', 'Dashboard')
-
-# t["nav_options"] is {Canonical: Display}
 nav_display_values = list(t["nav_options"].values())
 nav_canonical_keys = list(t["nav_options"].keys())
 
+# Maintain current page state across reruns
+current_page_canonical = st.session_state.get('current_page_canonical', 'Dashboard')
 try:
     default_index = nav_canonical_keys.index(current_page_canonical)
 except ValueError:
     default_index = 0
 
-# Use radio for Navigation for better visibility
 page_display = st.sidebar.radio(t["nav_label"], nav_display_values, index=default_index)
 
-# Update current page in session state
-# Map back from Display to Canonical
+# Update session state based on selection
 selected_canonical = next((k for k, v in t["nav_options"].items() if v == page_display), "Dashboard")
 st.session_state['current_page_canonical'] = selected_canonical
-
 page = selected_canonical
 
 st.sidebar.markdown("---")
-# st.sidebar.markdown(t["data_source"])
-    
-    # Display Current Source
-    # if selected_source != "Auto":
-    #    st.sidebar.caption(f"Source: {selected_source} (Forced)")
-    # elif api_key:
-    #    st.sidebar.caption(t["source_coingecko"])
-    # else:
-    #    # In Auto mode without key, it tries Binance then Yahoo
-    #    st.sidebar.caption(f"Source: Binance / Yahoo (Auto)")
-    
-    # Remove old static captions
-    # st.sidebar.caption("v1.3.0 (Binance Added)")
 
-# Fetch Data
+# 5. Data Fetching
+# Load historical and current price data for the selected coin
 with st.spinner(t["fetch_data"].format(coin=selected_coin)):
     df, source_used = fetch_coin_history(selected_coin, api_key, selected_source)
     current_price_data = fetch_current_price(selected_coin, api_key)
 
+# Error Handling: Stop if no data is found
 if df.empty or not current_price_data:
     st.error(t["load_error"].format(coin=selected_coin))
     st.stop()
 
-# --- Sidebar Footer: Data Source & Author ---
+# 6. Sidebar Footer
 st.sidebar.markdown(t["data_source"])
 st.sidebar.info("Binance, Yahoo, CoinGecko")
 
 st.sidebar.markdown("### About Author")
-
-# Try to load local logo
 import os
 logo_path = "jw_logo.png"
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, width=120)
 else:
-    st.sidebar.markdown("🦁 **JW**") # Fallback emoji if no image
+    st.sidebar.markdown("🦁 **JW**") 
 
 st.sidebar.markdown("[@JW_CryptoBeggar](https://x.com/JW_CryptoBeggar)")
+
 
 # --- Page: Dashboard ---
 if page == "Dashboard":

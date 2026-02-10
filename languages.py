@@ -1,6 +1,6 @@
 TRANSLATIONS = {
     "🇬🇧": {
-        "sidebar_title": "🔍 Crypto Analysis",
+        "sidebar_title": "🔍 Crypto Cycle Analysis",
         "select_asset": "Select Asset",
         "settings": "⚙️ Settings",
         "api_key_label": "CoinGecko API Key (Optional)",
@@ -78,7 +78,7 @@ TRANSLATIONS = {
         "dca_success": "Backtest Completed!"
     },
     "🇨🇳": {
-        "sidebar_title": "🔍 加密货币分析",
+        "sidebar_title": "🔍 加密货币周期分析",
         "select_asset": "选择资产",
         "settings": "⚙️ 设置",
         "api_key_label": "CoinGecko API Key (可选)",
@@ -156,7 +156,7 @@ TRANSLATIONS = {
         "dca_success": "回测完成！"
     },
     "🇯🇵": {
-        "sidebar_title": "🔍 暗号資産分析",
+        "sidebar_title": "🔍 暗号資産サイクル分析",
         "select_asset": "銘柄選択",
         "settings": "⚙️ 設定",
         "api_key_label": "CoinGecko APIキー (任意)",

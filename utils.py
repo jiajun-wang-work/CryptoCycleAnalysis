@@ -9,34 +9,34 @@ from datetime import datetime
 # CoinGecko API URL
 BASE_URL = "https://api.coingecko.com/api/v3"
 
-# Top 20 Coins Mapping
+# Top Coins Mapping (User Requested)
 # Name: (CoinGecko ID, Yahoo Ticker, Binance Symbol)
 COINS = {
     "Bitcoin (BTC)": ("bitcoin", "BTC-USD", "BTCUSDT"),
     "Ethereum (ETH)": ("ethereum", "ETH-USD", "ETHUSDT"),
-    "Binance Coin (BNB)": ("binancecoin", "BNB-USD", "BNBUSDT"),
     "Solana (SOL)": ("solana", "SOL-USD", "SOLUSDT"),
+    "Binance Coin (BNB)": ("binancecoin", "BNB-USD", "BNBUSDT"),
+    "Sui (SUI)": ("sui", "SUI-USD", "SUIUSDT"),
     "XRP (XRP)": ("ripple", "XRP-USD", "XRPUSDT"),
-    "Cardano (ADA)": ("cardano", "ADA-USD", "ADAUSDT"),
     "Dogecoin (DOGE)": ("dogecoin", "DOGE-USD", "DOGEUSDT"),
-    "Avalanche (AVAX)": ("avalanche-2", "AVAX-USD", "AVAXUSDT"),
-    "TRON (TRX)": ("tron", "TRX-USD", "TRXUSDT"),
-    "Polkadot (DOT)": ("polkadot", "DOT-USD", "DOTUSDT"),
-    "Chainlink (LINK)": ("chainlink", "LINK-USD", "LINKUSDT"),
-    "Polygon (MATIC)": ("matic-network", "MATIC-USD", "MATICUSDT"),
+    "Hyperliquid (HYPE)": ("hyperliquid", "HYPE-USD", "HYPEUSDT"),
     "Toncoin (TON)": ("the-open-network", "TON11419-USD", "TONUSDT"),
-    "Shiba Inu (SHIB)": ("shiba-inu", "SHIB-USD", "SHIBUSDT"),
-    "Litecoin (LTC)": ("litecoin", "LTC-USD", "LTCUSDT"),
-    "Bitcoin Cash (BCH)": ("bitcoin-cash", "BCH-USD", "BCHUSDT"),
-    "Ethereum Classic (ETC)": ("ethereum-classic", "ETC-USD", "ETCUSDT"),
-    "Stellar (XLM)": ("stellar", "XLM-USD", "XLMUSDT"),
-    "Monero (XMR)": ("monero", "XMR-USD", "XMRUSDT"),
-    "Cosmos (ATOM)": ("cosmos", "ATOM-USD", "ATOMUSDT")
+    "Sei (SEI)": ("sei-network", "SEI-USD", "SEIUSDT"),
+    "Aptos (APT)": ("aptos", "APT-USD", "APTUSDT"),
+    "Bitget Token (BGB)": ("bitget-token", "BGB-USD", "BGBUSDT"),
+    "OKB (OKB)": ("okb", "OKB-USD", "OKBUSDT"),
+    "Astar (ASTR)": ("astar", "ASTR-USD", "ASTRUSDT"),
 }
 
 def fetch_coin_history_yahoo(ticker_symbol):
     """
     Fetches historical data from Yahoo Finance as a fallback.
+    
+    Args:
+        ticker_symbol (str): The ticker symbol to fetch (e.g., 'BTC-USD').
+        
+    Returns:
+        pd.DataFrame: DataFrame containing 'price' column indexed by datetime.
     """
     try:
         ticker = yf.Ticker(ticker_symbol)
@@ -57,7 +57,6 @@ def fetch_coin_history_yahoo(ticker_symbol):
         
         return df
     except Exception as e:
-        # st.error(f"Error fetching data for {ticker_symbol} from Yahoo Finance: {e}")
         print(f"Error fetching data for {ticker_symbol} from Yahoo Finance: {e}")
         return pd.DataFrame()
 
@@ -65,6 +64,12 @@ def fetch_coin_history_binance(symbol):
     """
     Fetches historical data from Binance API (No Key Required).
     Iterates to fetch full history.
+    
+    Args:
+        symbol (str): The Binance trading pair symbol (e.g., 'BTCUSDT').
+        
+    Returns:
+        pd.DataFrame: DataFrame containing 'price' column indexed by datetime.
     """
     base_url = "https://api.binance.com/api/v3/klines"
     all_data = []
@@ -125,8 +130,6 @@ def fetch_coin_history_binance(symbol):
         return df[["price"]]
         
     except Exception as e:
-        # Binance might not have the symbol or other error
-        # st.warning(f"Binance API error for {symbol}: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
